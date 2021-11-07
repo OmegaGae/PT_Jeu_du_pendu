@@ -1,0 +1,5 @@
+*.pyc
+hangingGame
+test_pick.py
+test_pickler
+__pycache__
