@@ -1,5 +1,7 @@
 *.pyc
 hangingGame
+HangingGame_Scores_Storage
 test_pick.py
 test_pickler.py
+pytest_pickle_wnr_file.py
 __pycache__
