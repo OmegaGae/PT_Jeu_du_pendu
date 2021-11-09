@@ -9,33 +9,38 @@ class Players:
 
     def __init__(self) -> None:
         self.first_display = True
+        self.first_open_file = False
+        self.storage_player_letter = []
 
     def get_player_letter(self) -> str:
         """Get player letter"""
-        self.storage_player_letter = []
+        
         while True:
-            self.player_letter = input(f"Please enter \
-                an alphabetic letter: ").lower()
+            self.player_letter = input(
+                f"Please enter an alphabetic letter: ").lower()
             if self.player_letter.isalpha() and (
                 len(self.player_letter) > 0 and len(self.player_letter) < 2
             ):
                 self.storage_player_letter.append(self.player_letter)
                 return self.player_letter
 
-    @property
+    
     def players_history_scores(self) -> int:
         """Get the score of the current player \
             if he has already played this game"""
         try:
+            self.first_open_file = False
             with open("HangingGame_Scores_Storage", "rb") as readable_file_scores:
                 self.get_file_scores = pickle.Unpickler(readable_file_scores)
-                history_scores = self.get_file_scores.load()
+                self.history_scores = self.get_file_scores.load()
 
-                if self._name_player in history_scores:
-                    return history_scores[self._name_player]
+                if self._name_player in self.history_scores:
+                    print("yoooooooooooooo\n")
+                    return self.history_scores[self._name_player]
                 return 0
 
         except (EOFError, FileNotFoundError) as notexist:
+            self.first_open_file =True
             return 0
         except pickle.PicklingError as piPI:
             raise f"{piPI} error occurred, {self.get_file_scores} \
@@ -44,11 +49,18 @@ class Players:
             raise f"{piUN} error occurred, {self.get_file_scores} \
                 file is corrupted"
 
-    def write_on_file_history(self, player_information: dict) -> None:
+    def write_on_file_history(self, record_score: int) -> None:
         """Write on the file, data player such as 'player_name":score'"""
-        with open("HangingGame_Scores_Storage", "a+b") as writing_file_scores:
-            self.set_file_scores = pickle.Pickler(writing_file_scores)
-            self.set_file_scores.dump(player_information)
+        if self.first_open_file :
+             with open("HangingGame_Scores_Storage", "a+b") as writing_file_scores:
+                self.history_scores ={self._name_player:0}
+                self.set_file_scores = pickle.Pickler(writing_file_scores)
+                self.set_file_scores.dump(self.history_scores)
+        else: 
+            with open("HangingGame_Scores_Storage", "w+b") as writing_file_scores:
+                self.history_scores[self._name_player] = record_score
+                self.set_file_scores = pickle.Pickler(writing_file_scores)
+                self.set_file_scores.dump(self.history_scores)
 
     def player_score(self, mystery_word: str) -> int:
         """Return player score which is egal to the number of words found"""
@@ -70,21 +82,21 @@ class Players:
 
     def displayed_data_player(self,nameplayer,playerscore) -> None:
         
-        data = f"Player {nameplayer} :\n"
+        data = f"Player {nameplayer}:\n"
         data2 = f"Current point:{playerscore}\n"
         if self.first_display:
-            print(data, data2)
+            print(data,data2)
             self.first_display = False
         else:
-            data3 = f"You have already enter \
-                those letters:{self.storage_player_letter}\n"
-            print(data, data2, data3)
+            data3 = f"Yours letters:{self.storage_player_letter}"
+            print(data,data2,data3)
 
 
 class MysteryWord:
-    def __init__(self, player_letter ='none') -> None:
-        self.player_letter = player_letter
+    def __init__(self, letter ='none') -> None:
+        self._player_letter = letter
         self.first_display = True
+        self.displayed_word = []
         self.mystery_words = [
             "banane",
             "papa",
@@ -97,36 +109,40 @@ class MysteryWord:
             "deuschland",
             "france",
         ]
-    
-    def player_letter(self,letter:str)-> None:
-        self._player_letter = letter
 
     
+    def player_letter(self,letter_player):
+        self._player_letter = letter_player
+
     def one_word_selection(self) -> str:
-        self.mystery_word_index = random.randint(0, len(self.mystery_words))
+        self.mystery_word_index = random.randint(0, len(self.mystery_words)-1)
 
         return "".join(self.mystery_words[self.mystery_word_index])
 
     def display_mystery_word(self, word: str) -> str:
         """display state of mystery word and return \
             this state as a string type"""
-        i = 0
-        self.displayed_word = []
+        
         if self.first_display:
-            while i < len(word):
-                self.displayed_word[i]= '*'
-                i+=1
-            print(f"Mystery word: {self.display_mystery_word}\n")
+            for e in word:
+                self.displayed_word.append('*')
+            
             self.first_display = False
             return "".join(self.displayed_word)
+
+        elif self.first_display is not True and self._player_letter =='none':
+            egnima_word = "".join(self.displayed_word)
+            print(f"Mystery word: {egnima_word}\n")
+            return egnima_word
+
         else:
-            while i < len(word):
-                if self._player_letter is word[i]:
+            for i, e in enumerate(list(word)):
+                if self._player_letter == e:
                     self.displayed_word[i] = self._player_letter
-                self.displayed_word[i] = '*'
-                i += 1
-            print(f"Mystery word: {self.display_mystery_word}\n")
-            return "".join(self.displayed_word)
+            
+            egnima_word = "".join(self.displayed_word)
+            print(f"Mystery word: {egnima_word}\n")
+            return egnima_word
 
 def state_of_game()->bool:
     """Return the state of game based on the player, if he still want to play"""
@@ -148,30 +164,35 @@ def main():
         laps_number = 0
         player1 = Players()
         secret_word = MysteryWord()
+        print("Welcome to Hanging Game !")
         name_player1 = player1.name_player()
-        player1_score_record = player1.players_history_scores(name_player1)
+        player1_score_record = player1.players_history_scores()
         select_secret_word = secret_word.one_word_selection()
-        print("Welcome to Hanging Game !\n")
+        state_secret_word = secret_word.display_mystery_word(select_secret_word)
+        current_player_score = player1.player_score(state_secret_word)
         
         while laps_number < 12:
             player1.displayed_data_player(name_player1,current_player_score)
             state_secret_word = secret_word.display_mystery_word(select_secret_word)
-            current_player_score = Players.player_score(state_secret_word)
+            current_player_score =player1.player_score(state_secret_word)
+            
+            if current_player_score == len(state_secret_word):
+                print(f"Congratulation you've found the secret word : ")
+                print(f"{select_secret_word} !")
+                break
+            
             player1_letter = player1.get_player_letter()
             secret_word.player_letter(player1_letter)
             laps_number+=1
-            if current_player_score == len(state_secret_word):
-                print(f"Congratulation you've \
-                    found the secret word :{select_secret_word} !")
-                break
+
         if laps_number == 12:
-            print(f"Unfortunately you haven't \
-                found the secret word :{select_secret_word} !")
+            print("Unfortunately you've lost, ")
+            print(f"the secret word was :{select_secret_word} !")
             print(f"The next time may be your lucky egnima !")
         
         player1_score_record+=current_player_score
-        data_player1 = {name_player1:player1_score_record}
-        player1.write_on_file_history(data_player1)
+        print(f"here are your historical score:{player1_score_record}")
+        player1.write_on_file_history(player1_score_record)
         play_game = state_of_game()
     
     print("Thank you for your time playing this game !\nGood bye !\n")
