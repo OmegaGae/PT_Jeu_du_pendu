@@ -7,18 +7,22 @@ import typing
 
 class Player:
     def __init__(self):
-        pass
+        self._player_name = None
+        self.score = 0
 
     def get_name(self) -> str:
         """The player need to enter his name.
         This methode will return player_name.
         The player can enter only an alphabetic character"""
 
+        if self._player_name is not None:
+            return self._player_name
+
         while True:
-            self.player_name = input("Please player enter your name: ").lower()
-            if self.player_name.isalpha():
+            self._player_name = input("Please player enter your name: ").lower()
+            if self._player_name.isalpha():
                 print("\n")
-                return self.player_name
+                return self._player_name
 
     def get_letter(self) -> str:
         """The player need to enter an alphabetic letter.
@@ -32,57 +36,54 @@ class Player:
                 print("\n")
                 return self.player_letter
 
-    def score(self, secret_word_identified: str) -> int:
-        """Take as input a secret word identified.
-        The player score will be the difference between the word length
-        and the number of letter which is still hid, and return player_score."""
-
-        count = secret_word_identified.count("*")
-        return len(secret_word_identified) - count
-
 
 class ScoreRecording:
-    def __init__(self):
-        pass
+    def __init__(self, file: str = "HangingGame_Scores_Storage"):
+        self.file = file
+        self.scores = self._import_score_from_file()
 
-    def import_score_from_file(self, player_name: str) -> int:
+    def get_player_score(self, player_name: str) -> int:
+        return self.scores.get(player_name, 0)
+
+    def _import_score_from_file(self) -> typing.Dict[str, int]:
         """Take player_name as input, and return recording_score of the following player name"""
 
         try:
-            with open("HangingGame_Scores_Storage", "r+b") as read_file_scores:
-                self.unpickle_file_scores = pickle.Unpickler(read_file_scores)
-                self.get_recording_scores = self.unpickle_file_scores.load()
-
-                if player_name in self.get_recording_scores:
-                    return self.get_recording_scores[player_name]
-            return 0
+            with open(self.file, "r+b") as f:
+                return pickle.Unpickler(f).load()
         except (EOFError, FileNotFoundError):
-            return 0
-        except pickle.PicklingError as p:
-            raise f"{p} error occurred, {self.unpickle_file_scores} object doesn't support pickling"
+            print(f"File {self.file} not found")
+        except pickle.PicklingError as e:
+            print(
+                f"{e} error occurred, object contained on {self.file} doesn't support pickling"
+            )
         except pickle.UnpicklingError as e:
-            raise f"{e} error occurred, {self.unpickle_file_scores} file is corrupted"
+            print(f"{e} error occurred, object contained on {self.file} is corrupted")
+        return {}
 
-    def export_score_to_file(self, player_name: str, player_score: int) -> None:
+    def update_player_score_and_export_to_file(
+        self, player_name: str, player_score: int
+    ) -> None:
         """take as input player_name and player_score.
         Those parameters will be store inside a file as dictionnary type
         with player_name as key and player_score as value."""
 
-        with open("HangingGame_Scores_Storage", "w+b") as write_file_scores:
-            self.get_recording_scores[player_name] = player_score
-            self.set_file_scores = pickle.Pickler(write_file_scores)
-            self.set_file_scores.dump(self.get_recording_scores)
+        self.scores[player_name] = player_score
+
+        with open(self.file, "w+b") as f:
+            self.set_file_scores = pickle.Pickler(f).dump(self.scores)
 
 
 class SecretWord:
     def __init__(self):
-        self.secret_word_identified = []
+        self.identified_letters = []
+        self.secret_word = self._select_secret_word()
 
-    def select_secret_word(self) -> None:
+    def _select_secret_word(self) -> str:
         """Randomly selection of one word among a list of words.
         That word will be store in attribut secret_word"""
 
-        self.liste_secret_word = [
+        liste_secret_word = [
             "banane",
             "papa",
             "ciel",
@@ -94,39 +95,40 @@ class SecretWord:
             "deuschland",
             "france",
         ]
-        indice_random = random.randint(0, len(self.liste_secret_word) - 1)
-        self.secret_word = self.liste_secret_word[indice_random]
+        indice_random = random.randint(0, len(liste_secret_word) - 1)
+        return liste_secret_word[indice_random]
+
+    @property
+    def identified_word(self):
+        return "".join(
+            [
+                letter if letter in self.identified_letters else "*"
+                for letter in self.secret_word
+            ]
+        )
 
     def identify_letter_in_word(
         self, player_letter: typing.Optional[str] = None
-    ) -> str:
+    ) -> bool:
         """take player letter as input, check if player letter
         is inside secret word, and return secret word regarding the identification"""
 
-        if type(player_letter) == str:
-            for i, e in enumerate(list(self.secret_word)):
-                if player_letter == e:
-                    self.secret_word_identified[i] = e
-            return "".join(self.secret_word_identified)
-        else:
-            for e in self.secret_word:
-                self.secret_word_identified.append("*")
-
-            return "".join(self.secret_word_identified)
-
-    def display_secret_word(self) -> None:
-        str_secret_word_identified = "".join(self.secret_word_identified)
-        print(f"Secret word: {str_secret_word_identified}")
+        if player_letter is not None and player_letter in self.secret_word:
+            self.identified_letters.append(player_letter)
+            return True
+        return False
 
 
-class Game(Player, SecretWord, ScoreRecording):
+class Game:
     def __init__(self):
-        self.play_game = True
+        self._reset_game()
 
-    def score_control(self, recording_score: int, player_score: int) -> int:
-        """Computing the new player recording score and return it"""
-        recording_score += player_score
-        return recording_score
+    def _reset_game(self):
+        self.play_game = True
+        self.player = Player()
+        self.word = SecretWord()
+        self.score_recording = ScoreRecording()
+        self.laps_number = 0
 
     def display_player_information(
         self,
@@ -137,32 +139,24 @@ class Game(Player, SecretWord, ScoreRecording):
         """print name_player:str score_player:int and last_player_letter:list"""
 
         if type(player_letter) == str:
-            self.storage_player_letter.append(player_letter)
             print(
                 f" Player name: {player_name}\n",
                 f"Current point: {player_score}\n",
-                f"Last letters enter: {self.storage_player_letter}",
+                f"Last letters enter: {self.word.identified_letters}",
             )
         else:
             print(f"Player name: {player_name}\n", f"Current point: {player_score}\n")
 
     def game_launcher(self) -> int:
         """Launch all init state of the game and return player recording score"""
-        self.laps_number = 0
-        self.storage_player_letter = []
-        self.secret_word_identified = []
-        self.get_recording_scores = {}
+        self._reset_game()
 
         print("Welcome To Hanging Game !\n")
-        self.game_player_name = self.get_name()
-        recording_score = self.import_score_from_file(self.game_player_name)
-        self.select_secret_word()
-        secret_word = self.identify_letter_in_word()
-        current_player_score = self.score(secret_word)
-        self.display_player_information(self.game_player_name, current_player_score)
-        self.display_secret_word()
-
-        return recording_score
+        self.player.score = self.score_recording.get_player_score(
+            self.player.get_name()
+        )
+        self.display_player_information(self.player.get_name(), self.player.score)
+        print(self.word.identified_word)
 
     def game_stopper(self):
         """Return the state of game based on the player, if he still wants to play"""
@@ -182,34 +176,35 @@ class Game(Player, SecretWord, ScoreRecording):
         each method needed"""
 
         while self.play_game:
-            recording_score = self.game_launcher()
+            self.game_launcher()
             while self.laps_number < 10:
-                player_letter = self.get_letter()
-                secret_word = self.identify_letter_in_word(player_letter)
+                player_letter = self.player.get_letter()
 
-                current_player_score = self.score(secret_word)
-                if current_player_score == len(secret_word):
+                if self.word.identify_letter_in_word(player_letter):
+                    self.player.score += 1
+                if self.word.identified_word == self.word.secret_word:
                     print(
-                        f"Congratulation you've found the secret word : {self.secret_word}!\n"
+                        f"Congratulation you've found the secret word : {self.word.secret_word}!\n"
                     )
                     break
                 self.laps_number += 1
                 if self.laps_number == 10:
                     print(
                         "Unfortunately you've lost !\n",
-                        f"the secret word was :{self.secret_word} !\n",
+                        f"the secret word was :{self.word.secret_word} !\n",
                         "The next time may be your lucky egnima !",
                     )
                     break
 
                 self.display_player_information(
-                    self.game_player_name, current_player_score, player_letter
+                    self.player.get_name(), self.player.score, player_letter
                 )
-                self.display_secret_word()
+                print(self.word.identified_word)
 
-            recording_score = self.score_control(recording_score, current_player_score)
-            print(f"here is your historical score:{recording_score}")
-            self.export_score_to_file(self.game_player_name, recording_score)
+            print(f"here is your score: {self.player.score}")
+            self.score_recording.update_player_score_and_export_to_file(
+                self.player.get_name(), self.player.score
+            )
             self.play_game = self.game_stopper()
 
         print("Thank you for your time playing this game !\nGood bye !\n")
